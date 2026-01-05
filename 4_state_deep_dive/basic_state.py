@@ -1,0 +1,64 @@
+from typing import TypedDict,List,Annotated
+from langgraph.graph import StateGraph, END
+import operator
+# class SimpleState(TypedDict):
+#     count: int
+#     sum: int 
+#     history: List[int]
+
+
+# def increment(state: SimpleState) -> SimpleState: 
+#     # manually updating the state
+#     new_count = state["count"] + 1
+#     return {
+#         "count" :  new_count,
+#         "sum" : state["sum"] + new_count,
+#         "history" : state["history"] + [new_count]
+#     }
+
+class SimpleState(TypedDict):
+    count: int
+    sum: Annotated[int, operator.add] # we define how the values to be updated if required operator not available then use manual transformation
+    history: Annotated[List[int],operator.concat]
+
+def increment(state: SimpleState) -> SimpleState: 
+    # Annotated state transformation
+    new_count = state["count"] + 1
+    return {
+        "count" :  new_count,
+        "sum" :  new_count,
+        "history" : [new_count]
+    }
+
+
+def should_continue(state: SimpleState):
+    if (state["count"]<5):
+        return "continue"
+    else:
+        return "stop"
+
+    
+graph = StateGraph(SimpleState)
+
+graph.add_node("increment",increment)
+graph.set_entry_point("increment")
+graph.add_conditional_edges(
+    "increment",
+    should_continue,
+    {
+        "continue":"increment",
+        "stop": END
+    }
+)
+
+app = graph.compile()
+
+state = {
+    "count": 0,
+    "sum": 0,
+    "history": []
+}
+
+res = app.invoke(state)
+print(res)
+
