@@ -25,6 +25,14 @@
 1. state is a way to maintain and track information as an AI system processes data.
 2. a new state object is created at every node using the old state. states are immutable. 
 3. STATE TRANSFORMATION : manual, annotated
+4. In a StateGraph:
+    Each node is a function that takes the current state as input.
+    The node returns a partial dictionary with keys matching the state schema.
+    The graph automatically merges this returned dictionary into the current state.
+5. TypedDict is just a schema → it does not create missing keys or assign defaults.
+    Any key that appears in the state must either:
+    Be present in the invoke() input, or
+    Be returned by a node in the graph.
 
 ## ReACT Agent with langGraph:
 1. basic workflow of ReACT: **think -> action -> action_input -> tools execution -> observe** 
@@ -104,4 +112,33 @@ python 5_react_agent/react_graph.py
     The latest SpaceX launch was 1 day ago. final result
 
 
+## ToolNode
+what ToolNode does internally.
+Here’s the flow:
+1. LLM output contains tool calls
+    When you run:
+    llm_with_tools.invoke(state["messages"])
+    the LLM may return something like:
+    {
+    "text": "I found some results",
+    "tool_calls": [
+        {"tool": "TavilySearchResults", "tool_input": {"query": "AI news"}}
+    ]
+    }
+    tool_calls is just a plan — no actual tool execution yet.
+2. ToolNode executes the tool
+    When the graph routes to tool_node:
+    tool_node = ToolNode(tools=tools)
+    It reads the last LLM message (state["messages"][-1]) and looks for tool_calls.
+    For each planned call:
+    It finds the matching tool in tools.
+    Runs tool.invoke(...).
+    The output of the tool is then added back into the state.
+3. ToolNode appends the results as AIMessage
+    Each tool result is wrapped as an AIMessage and appended to the messages list.
+    That way, the next LLM invocation sees both:
+    The user’s message
+    The tool output
+    Effectively:
+    state["messages"].append(AIMessage(content=str(tool_result)))
 
